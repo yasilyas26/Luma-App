@@ -1,0 +1,159 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function roomPath(code) {
+      return /databases/$(database)/documents/rooms/$(code);
+    }
+
+    function isMember(code) {
+      return signedIn() && request.auth.uid in get(roomPath(code)).data.memberIds;
+    }
+
+    function isHost(code) {
+      return signedIn() && get(roomPath(code)).data.hostId == request.auth.uid;
+    }
+
+    // Foto profil (gambar kecil base64). Hanya pemilik yang boleh menulis.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow delete: if signedIn() && uid == request.auth.uid;
+      allow create, update: if signedIn()
+        && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(['photo', 'useGoogle', 'gphoto', 'updatedAt'])
+        && (!('photo' in request.resource.data)
+            || request.resource.data.photo.size() < 450000);
+    }
+
+    match /rooms/{code} {
+
+      // Cek room lewat kode boleh untuk user login; daftar room hanya milik sendiri.
+      allow get: if signedIn();
+      allow list: if signedIn() && request.auth.uid in resource.data.memberIds;
+
+      // Buat room: hanya sebagai host, status awal "selecting", host satu-satunya anggota.
+      allow create: if signedIn()
+        && code.matches('[0-9]{5}')
+        && request.resource.data.keys().hasOnly([
+             'name', 'hostId', 'hostName', 'status', 'genres', 'yearFrom',
+             'yearTo', 'maxMembers', 'pool', 'providers', 'inTheater',
+             'memberIds', 'createdAt'])
+        && request.resource.data.hostId == request.auth.uid
+        && request.resource.data.status == 'selecting'
+        && request.resource.data.memberIds == [request.auth.uid]
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 60
+        && request.resource.data.maxMembers is int
+        && request.resource.data.maxMembers >= 2
+        && request.resource.data.maxMembers <= 10
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if signedIn() && (
+        // Gabung: hanya menambah diri sendiri, room belum penuh dan masih tahap memilih.
+        ( !(request.auth.uid in resource.data.memberIds)
+          && resource.data.status == 'selecting'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
+          && request.resource.data.memberIds
+               == resource.data.memberIds.concat([request.auth.uid])
+          && request.resource.data.memberIds.size() <= resource.data.maxMembers )
+        // Keluar: anggota (bukan host) hanya menghapus diri sendiri.
+        || ( request.auth.uid in resource.data.memberIds
+             && request.auth.uid != resource.data.hostId
+             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['memberIds'])
+             && !(request.auth.uid in request.resource.data.memberIds)
+             && request.resource.data.memberIds.size()
+                  == resource.data.memberIds.size() - 1 )
+        // Status: anggota membuka voting; hanya host yang menutup sesi.
+        || ( request.auth.uid in resource.data.memberIds
+             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+             && (
+                  ( resource.data.status == 'selecting'
+                    && request.resource.data.status == 'voting' )
+                  || ( request.auth.uid == resource.data.hostId
+                       && request.resource.data.status == 'completed'
+                       && resource.data.status in ['selecting', 'voting'] )
+                  // Host mengakhiri sesi: semua anggota keluar ke beranda.
+                  || ( request.auth.uid == resource.data.hostId
+                       && request.resource.data.status == 'closed'
+                       && resource.data.status in ['selecting', 'voting', 'completed'] )
+                  // Anggota membuka kembali room (mis. hasil seri) untuk memilih ulang.
+                  || ( request.resource.data.status == 'selecting'
+                       && resource.data.status in ['voting', 'completed'] )
+                ) )
+      );
+
+      allow delete: if signedIn() && resource.data.hostId == request.auth.uid;
+
+      // ---- Anggota
+      match /members/{uid} {
+        allow read: if isMember(code);
+
+        allow create: if signedIn()
+          && uid == request.auth.uid
+          && request.auth.uid in getAfter(roomPath(code)).data.memberIds
+          && request.resource.data.keys().hasOnly(['name', 'role', 'ready', 'joinedAt'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 60
+          && request.resource.data.ready == false
+          && request.resource.data.role
+               == (getAfter(roomPath(code)).data.hostId == request.auth.uid
+                   ? 'host' : 'member');
+
+        allow update: if isMember(code)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ready'])
+          && request.resource.data.ready is bool
+          && (
+               uid == request.auth.uid
+               // Room dibuka kembali (belum ada pemenang): status siap semua
+               // anggota di-reset supaya konfirmasi ulang.
+               || ( request.resource.data.ready == false
+                    && get(roomPath(code)).data.status == 'selecting' )
+             );
+
+        allow delete: if signedIn() && (uid == request.auth.uid || isHost(code));
+      }
+
+      // ---- Film kandidat
+      match /picks/{filmId} {
+        allow read: if isMember(code);
+
+        allow create: if isMember(code)
+          && get(roomPath(code)).data.status == 'selecting'
+          && request.resource.data.keys().hasOnly(
+               ['film', 'pickedBy', 'pickedByName', 'pickedAt'])
+          && request.resource.data.pickedBy == request.auth.uid
+          && request.resource.data.film is map
+          && request.resource.data.pickedAt == request.time;
+
+        // Tidak ada update: film yang sudah dipilih tidak bisa ditimpa orang lain.
+        allow delete: if isMember(code)
+          && get(roomPath(code)).data.status == 'selecting'
+          && (resource.data.pickedBy == request.auth.uid || isHost(code));
+      }
+
+      // ---- Suara
+      match /votes/{uid} {
+        allow read: if isMember(code);
+
+        allow create, update: if isMember(code)
+          && uid == request.auth.uid
+          && get(roomPath(code)).data.status == 'voting'
+          && request.resource.data.keys().hasOnly(['filmId', 'name', 'votedAt'])
+          && request.resource.data.filmId is string
+          && exists(/databases/$(database)/documents/rooms/$(code)/picks/$(request.resource.data.filmId))
+          && request.resource.data.votedAt == request.time;
+
+        // Suara lama boleh dibersihkan anggota saat room kembali ke tahap memilih.
+        allow delete: if signedIn() && (
+          uid == request.auth.uid || isHost(code)
+          || (isMember(code)
+              && get(roomPath(code)).data.status == 'selecting'));
+      }
+    }
+  }
+}
