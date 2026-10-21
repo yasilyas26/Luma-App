@@ -7,11 +7,10 @@ import 'profile_screen.dart';
 import 'settings_screen.dart';
 import 'user_avatar.dart';
 
-/// Tombol avatar di pojok kanan atas. Ketuk untuk membuka dialog akun di tengah
-/// layar (latar gelap) berisi: Profil, Pengaturan, Log out.
+/// Tombol avatar di pojok kanan atas. Ketuk untuk membuka sidebar akun yang
+/// slide dari kanan (latar gelap) berisi: Profil, Pengaturan, Log out.
 class ProfileMenuButton extends StatelessWidget {
-  const ProfileMenuButton(
-      {super.key, required this.onChanged, this.onHistory});
+  const ProfileMenuButton({super.key, required this.onChanged, this.onHistory});
 
   /// Dipanggil saat "Riwayat ruangan" dipilih.
   final VoidCallback? onHistory;
@@ -20,10 +19,20 @@ class ProfileMenuButton extends StatelessWidget {
   final VoidCallback onChanged;
 
   Future<void> _open(BuildContext context) async {
-    final choice = await showDialog<String>(
+    final choice = await showGeneralDialog<String>(
       context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Tutup',
       barrierColor: Colors.black.withValues(alpha: 0.5),
-      builder: (_) => _AccountDialog(showHistory: onHistory != null),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (_, anim, __) => _AccountSidebar(
+        showHistory: onHistory != null,
+        animation: CurvedAnimation(
+            parent: anim,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic),
+      ),
+      transitionBuilder: (_, __, ___, child) => child,
     );
     if (choice == null || !context.mounted) return;
 
@@ -82,59 +91,87 @@ class ProfileMenuButton extends StatelessWidget {
   }
 }
 
-class _AccountDialog extends StatelessWidget {
-  const _AccountDialog({required this.showHistory});
+class _AccountSidebar extends StatelessWidget {
+  const _AccountSidebar({required this.showHistory, required this.animation});
   final bool showHistory;
+  final Animation<double> animation;
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      backgroundColor: Colors.transparent,
-      elevation: 0,
-      shadowColor: Colors.transparent,
-      surfaceTintColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: GlassPanel(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Align(
-                alignment: Alignment.centerRight,
-                child: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: Icon(Icons.close, color: C.muted),
-                  tooltip: 'Tutup',
+    final width = MediaQuery.sizeOf(context).width;
+    // Slide dipasang di panel (bukan di Align selebar layar) supaya offset 1
+    // = lebar panel dan panel muncul tepat dari tepi kanan layar.
+    // ClipRect: di layar lebar app dibatasi kolom 640px (phoneFrame), jadi
+    // panel tidak boleh tergambar di luar kolom saat slide masuk.
+    return ClipRect(
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+              .animate(animation),
+          child: Material(
+            color: C.card,
+            child: Container(
+              width: width * 0.85 < 340 ? width * 0.85 : 340,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                  border: Border(left: BorderSide(color: C.border))),
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  child: Column(
+                    children: [
+                      Expanded(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: [
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: IconButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  icon: Icon(Icons.close, color: C.muted),
+                                  tooltip: 'Tutup',
+                                ),
+                              ),
+                              const UserAvatar(size: 84),
+                              const SizedBox(height: 14),
+                              Text(AuthService.name,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 4),
+                              Text(AuthService.email,
+                                  textAlign: TextAlign.center,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 13.5, color: C.muted)),
+                              const SizedBox(height: 20),
+                              Divider(height: 1, color: C.border),
+                              const SizedBox(height: 10),
+                              _row(context, 'profile', Icons.person_outline,
+                                  'Profil'),
+                              if (showHistory)
+                                _row(context, 'history', Icons.history,
+                                    'Riwayat ruangan'),
+                              _row(context, 'settings', Icons.settings_outlined,
+                                  'Pengaturan'),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Divider(height: 1, color: C.border),
+                      const SizedBox(height: 10),
+                      _row(context, 'logout', Icons.logout, 'Log out',
+                          color: C.accent),
+                    ],
+                  ),
                 ),
               ),
-              const UserAvatar(size: 84),
-              const SizedBox(height: 14),
-              Text(AuthService.name,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 19, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 4),
-              Text(AuthService.email,
-                  textAlign: TextAlign.center,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13.5, color: C.muted)),
-              const SizedBox(height: 20),
-              Divider(height: 1, color: C.border),
-              const SizedBox(height: 10),
-              _row(context, 'profile', Icons.person_outline, 'Profil'),
-              if (showHistory)
-                _row(context, 'history', Icons.history, 'Riwayat ruangan'),
-              _row(context, 'settings', Icons.settings_outlined, 'Pengaturan'),
-              const SizedBox(height: 10),
-              Divider(height: 1, color: C.border),
-              const SizedBox(height: 10),
-              _row(context, 'logout', Icons.logout, 'Log out', color: C.accent),
-            ],
+            ),
           ),
         ),
       ),
