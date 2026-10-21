@@ -31,8 +31,59 @@
 
   <title>LUMA</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    #boot-skel{position:fixed;inset:0;z-index:2;display:none;justify-content:center;background:var(--o);overflow:hidden}
+    #boot-skel .col{width:100%;max-width:640px;padding:20px 16px;box-sizing:border-box;background:var(--b);overflow:hidden}
+    /* Satu gelombang kilau menyapu seluruh halaman (fixed) agar terasa menyatu. */
+    #boot-skel .s{border-radius:12px;flex:none;background-color:var(--c);
+      background-image:linear-gradient(105deg,transparent 35%,var(--h) 50%,transparent 65%);
+      background-size:60vw 100%;background-repeat:no-repeat;background-attachment:fixed;
+      background-position:-60vw 0;animation:sh 1.6s cubic-bezier(.4,0,.2,1) infinite}
+    #boot-skel .col>*{opacity:0;animation:up .5s ease-out forwards}
+    #boot-skel .col>*:nth-child(2){animation-delay:.08s}
+    #boot-skel .col>*:nth-child(3){animation-delay:.16s}
+    #boot-skel .col>*:nth-child(4){animation-delay:.24s}
+    #boot-skel .col>*:nth-child(5){animation-delay:.32s}
+    #boot-skel .col>*:nth-child(6){animation-delay:.4s}
+    #boot-skel .row{display:flex;gap:12px;overflow:hidden;margin-bottom:26px}
+    #boot-skel .p{width:116px;height:172px}
+    @keyframes sh{to{background-position:calc(100vw + 60vw) 0}}
+    @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+    @media (prefers-reduced-motion:reduce){#boot-skel .s,#boot-skel .col>*{animation:none;opacity:1}}
+  </style>
 </head>
 <body>
+  <div id="boot-skel"><div class="col">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:22px">
+      <div class="s" style="width:96px;height:24px"></div>
+      <div class="s" style="width:44px;height:44px;border-radius:50%"></div>
+    </div>
+    <div class="s" style="height:210px;border-radius:20px;margin-bottom:28px"></div>
+    <div style="margin-bottom:14px"><div class="s" style="width:150px;height:16px;margin-bottom:8px"></div><div class="s" style="width:220px;height:11px"></div></div>
+    <div class="row"><div class="s p"></div><div class="s p"></div><div class="s p"></div><div class="s p"></div></div>
+    <div style="margin-bottom:14px"><div class="s" style="width:130px;height:16px;margin-bottom:8px"></div><div class="s" style="width:190px;height:11px"></div></div>
+    <div class="row"><div class="s p"></div><div class="s p"></div><div class="s p"></div><div class="s p"></div></div>
+  </div></div>
+  <script>
+    // Skeleton hanya saat sudah pernah buka (cache ada) dan Flutter belum siap.
+    (function () {
+      try {
+        if (localStorage.getItem('flutter.splash_seen') !== 'true') return;
+        var m = (localStorage.getItem('flutter.theme_mode') || '').replace(/"/g, '');
+        var dark = m === 'dark' || (m !== 'light' &&
+          window.matchMedia('(prefers-color-scheme: dark)').matches);
+        var el = document.getElementById('boot-skel'), st = el.style;
+        st.setProperty('--o', dark ? '#0A0A0C' : '#E9E9EE');
+        st.setProperty('--b', dark ? '#111114' : '#F4F4F7');
+        st.setProperty('--c', dark ? '#222227' : '#E7E7EC');
+        st.setProperty('--h', dark ? 'rgba(255,255,255,.09)' : 'rgba(255,255,255,.75)');
+        st.display = 'flex';
+        var done = function () { if (el) { el.remove(); el = null; } };
+        window.addEventListener('flutter-first-frame', done);
+        setTimeout(done, 20000);
+      } catch (e) {}
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

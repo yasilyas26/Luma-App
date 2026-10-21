@@ -98,7 +98,12 @@ class _AccountSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
+    final size = MediaQuery.sizeOf(context);
+    final width = size.width < 640 ? size.width : 640.0;
+    // Skala ikut ukuran layar (acuan 390px) supaya font, avatar, dan ikon
+    // proporsional di layar kecil maupun besar.
+    final s = (width / 390).clamp(0.85, 1.2).toDouble();
+    final panelW = (340 * s) < width * 0.85 ? 340 * s : width * 0.85;
     // Slide dipasang di panel (bukan di Align selebar layar) supaya offset 1
     // = lebar panel dan panel muncul tepat dari tepi kanan layar.
     // ClipRect: di layar lebar app dibatasi kolom 640px (phoneFrame), jadi
@@ -112,13 +117,13 @@ class _AccountSidebar extends StatelessWidget {
           child: Material(
             color: C.card,
             child: Container(
-              width: width * 0.85 < 340 ? width * 0.85 : 340,
+              width: panelW,
               height: double.infinity,
               decoration: BoxDecoration(
                   border: Border(left: BorderSide(color: C.border))),
               child: SafeArea(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  padding: EdgeInsets.fromLTRB(20 * s, 12 * s, 20 * s, 20 * s),
                   child: Column(
                     children: [
                       Expanded(
@@ -129,18 +134,18 @@ class _AccountSidebar extends StatelessWidget {
                                 alignment: Alignment.centerRight,
                                 child: IconButton(
                                   onPressed: () => Navigator.pop(context),
-                                  icon: Icon(Icons.close, color: C.muted),
+                                  icon: Icon(Icons.close, color: C.muted, size: 24 * s),
                                   tooltip: 'Tutup',
                                 ),
                               ),
-                              const UserAvatar(size: 84),
-                              const SizedBox(height: 14),
+                              UserAvatar(size: 84 * s),
+                              SizedBox(height: 14 * s),
                               Text(AuthService.name,
                                   textAlign: TextAlign.center,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                      fontSize: 19,
+                                  style: TextStyle(
+                                      fontSize: 19 * s,
                                       fontWeight: FontWeight.w700)),
                               const SizedBox(height: 4),
                               Text(AuthService.email,
@@ -148,16 +153,16 @@ class _AccountSidebar extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: TextStyle(
-                                      fontSize: 13.5, color: C.muted)),
-                              const SizedBox(height: 20),
+                                      fontSize: 13.5 * s, color: C.muted)),
+                              SizedBox(height: 20 * s),
                               Divider(height: 1, color: C.border),
                               const SizedBox(height: 10),
-                              _row(context, 'profile', Icons.person_outline,
+                              _row(context, s, 'profile', Icons.person_outline,
                                   'Profil'),
                               if (showHistory)
-                                _row(context, 'history', Icons.history,
+                                _row(context, s, 'history', Icons.history,
                                     'Riwayat ruangan'),
-                              _row(context, 'settings', Icons.settings_outlined,
+                              _row(context, s, 'settings', Icons.settings_outlined,
                                   'Pengaturan'),
                             ],
                           ),
@@ -165,7 +170,7 @@ class _AccountSidebar extends StatelessWidget {
                       ),
                       Divider(height: 1, color: C.border),
                       const SizedBox(height: 10),
-                      _row(context, 'logout', Icons.logout, 'Log out',
+                      _row(context, s, 'logout', Icons.logout, 'Log out',
                           color: C.accent),
                     ],
                   ),
@@ -178,25 +183,25 @@ class _AccountSidebar extends StatelessWidget {
     );
   }
 
-  Widget _row(BuildContext context, String value, IconData icon, String label,
+  Widget _row(BuildContext context, double s, String value, IconData icon, String label,
       {Color? color}) {
     return InkWell(
       borderRadius: BorderRadius.circular(12),
       onTap: () => Navigator.pop(context, value),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 15),
+        padding: EdgeInsets.symmetric(horizontal: 12 * s, vertical: 15 * s),
         child: Row(
           children: [
-            Icon(icon, size: 24, color: color ?? C.muted),
-            const SizedBox(width: 16),
+            Icon(icon, size: 24 * s, color: color ?? C.muted),
+            SizedBox(width: 16 * s),
             Text(label,
                 style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 16 * s,
                     fontWeight: FontWeight.w600,
                     color: color ?? C.text)),
             const Spacer(),
             if (color == null)
-              Icon(Icons.chevron_right, size: 22, color: C.muted),
+              Icon(Icons.chevron_right, size: 22 * s, color: C.muted),
           ],
         ),
       ),

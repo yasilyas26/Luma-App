@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services.dart';
 import '../app_info.dart';
@@ -21,14 +22,34 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _progress = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 2400))
-    ..forward();
+      vsync: this, duration: const Duration(milliseconds: 2400));
   Timer? _timer;
+
+  /// Splash hanya tampil saat belum ada cache (kunjungan pertama); setelah itu
+  /// langsung masuk tanpa jeda.
+  static const _seenKey = 'splash_seen';
+  bool _cached = false;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(milliseconds: 2600), () async {
+    _start();
+  }
+
+  Future<void> _start() async {
+    var seen = false;
+    try {
+      final p = await SharedPreferences.getInstance();
+      seen = p.getBool(_seenKey) ?? false;
+      if (!seen) await p.setBool(_seenKey, true);
+    } catch (_) {}
+    if (!mounted) return;
+    if (seen) {
+      setState(() => _cached = true);
+    } else {
+      _progress.forward();
+    }
+    _timer = Timer(Duration(milliseconds: seen ? 0 : 2600), () async {
       if (!mounted) return;
       final reset = DeepLink.resetCode;
       if (reset != null) {
@@ -66,6 +87,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_cached) return Scaffold(backgroundColor: C.bg);
     return Scaffold(
       body: Container(
         decoration: BoxDecoration(

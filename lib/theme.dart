@@ -505,7 +505,7 @@ class Skeleton extends StatefulWidget {
 class _SkeletonState extends State<Skeleton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 1300))
+      vsync: this, duration: const Duration(milliseconds: 1600))
     ..repeat();
 
   @override
@@ -516,8 +516,8 @@ class _SkeletonState extends State<Skeleton>
 
   @override
   Widget build(BuildContext context) {
-    final base = C.dark ? const Color(0xFF25252A) : const Color(0xFFE7E7EC);
-    final shine = C.dark ? const Color(0xFF35353C) : const Color(0xFFF7F7FA);
+    final base = C.dark ? const Color(0xFF222227) : const Color(0xFFE7E7EC);
+    final shine = C.dark ? const Color(0xFF34343B) : const Color(0xFFF8F8FB);
     return AnimatedBuilder(
       animation: _c,
       builder: (_, __) => Container(
@@ -529,7 +529,7 @@ class _SkeletonState extends State<Skeleton>
               widget.circle ? null : BorderRadius.circular(widget.radius),
           gradient: LinearGradient(
             colors: [base, shine, base],
-            stops: const [0.3, 0.5, 0.7],
+            stops: const [0.25, 0.5, 0.75],
             transform: _SlideGradient(-1 + 2 * _c.value),
           ),
         ),
